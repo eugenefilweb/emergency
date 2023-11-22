@@ -1,6 +1,6 @@
 class Poteka {
 
-    constructor({apiUrl, user_pass, swPoint, nePoint, element, poteka, potekaId, endDate, startDate, zoom }){
+    constructor({apiUrl, user_pass, swPoint, nePoint, element, poteka, potekaId, endDate, startDate, zoom}) {
         mapboxgl.accessToken = 'pk.eyJ1Ijoicm9lbGZpbHdlYiIsImEiOiJjbGh6am1tankwZzZzM25yczRhMWhhdXRmIn0.aLWnLb36hKDFVFmKsClJkg';
         this.apiUrl = apiUrl;
         this.user_pass = user_pass;
@@ -14,10 +14,12 @@ class Poteka {
         this.zoom = 12;
         this.longitude = 121.45;
         this.latitude = 14.45;
+        this.markers = [];
+        this.img = null;
         this.map = this.createMapInstance();
     }
 
-    createMapInstance(){
+    createMapInstance() {
         return new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/streets-v12',
@@ -26,9 +28,23 @@ class Poteka {
         });
     }
 
-    fetchData(callback){
+    createMarkerElement(icon) {
+        const markerElement = document.createElement('div');
+        markerElement.className = 'poteka-marker';
+        markerElement.id = 'marker';
+        markerElement.innerHTML = `<img class="marker" id="marker" src="${icon ? icon : '/assets/svg/location-dot-solid.svg'}" alt="marker" style="width: 35px; height: 35px;">`;
+
+        return markerElement;
+    }
+
+    //TODO fetchData(callback){
+    fetchData() {
         const self = this;
-        $(document).ready(function(){
+        // this.markers.forEach(marker => marker.remove());
+        //
+        // this.markers = [];
+
+        $(document).ready(function () {
             $.ajax({
                 url: self.apiUrl,
                 type: 'GET',
@@ -36,17 +52,17 @@ class Poteka {
                     'swPoint': self.swPoint,
                     'nePoint': self.nePoint,
                     'element': self.element,
-                    'poteka' : self.poteka,
+                    'poteka': self.poteka,
                     'potekaId': self.potekaId,
-                    'endDate' : self.endDate,
+                    'endDate': self.endDate,
+                    // 'startDate' : self.startDate
                 },
                 headers: {
                     'X-POTEKA-Authorization': btoa(self.user_pass)
                 },
                 dataType: 'json',
-                success: function(data){
-                    // callback(null, data.poteka);
-                    // console.log('Data: ',data);
+                success: function (data) {
+                    //TODO callback(null, data.poteka);
 
                     data.poteka.map(potekaData => {
 
@@ -74,7 +90,7 @@ class Poteka {
                                 'PM25': ''
                             };
 
-                            return `<li>
+                            return `<li class="elem" data-value='${elem.elementName}'>
                                     <div><span>${elem.elementName}: </span> ${elem.dataList[0].value} ${units[elem.elementName]}</div>
                                 </li>`;
                         }).join('');
@@ -100,32 +116,71 @@ class Poteka {
                             </div>`
                         );
 
-                        new mapboxgl.Marker()
+                        const markerElement = self.createMarkerElement(self.img);
+
+                        const marker = new mapboxgl.Marker({element: markerElement})
                             .setLngLat([potekaData.stationInfo.longitude, potekaData.stationInfo.latitude])
                             .setPopup(popup)
                             .addTo(self.map);
                         // });
 
+                        self.markers.push(marker);
+
+                        //TODO target popup html using vanilla javascript
+                        // popup._content.querySelector('.test-popup').addEventListener('click', function () {
+                        //     console.log('test-popup clicked');
+                        // });
+
                     });
 
                 },
-                error: function(xhr,error, status ){
-                    // console.log(xhr);
-                    callback(error, null);
+                error: function (xhr, error, status) {
+                    console.log('xhr: ', xhr);
+                    // callback(error, null);
                 }
             })
         })
-
     }
 
-     init(callback){
+    // init(callback){
+    init() {
+        this.img = localStorage.getItem('markerImg') ?? null;
         const self = this;
-        this.fetchData(callback);
+        // this.fetchData(callback);
+        this.fetchData();
         self.map;
         // Fetch data every minute
         setInterval(() => {
-            this.fetchData(callback);
+            // this.fetchData(callback);
+            this.fetchData();
         }, 60000); // 60000 milliseconds = 1 minute
+
+        $(document).on('click', '.elem', function () {
+            const elem = $(this).data('value');
+            const markers = {
+                'temp': 'hummingbird',
+                'weather': 'tree',
+                'rain': 'zoo',
+                'solar': 'W/m²',
+                'humi': '%RH',
+                'wbgt': '°C',
+                'option': '',
+                'PM25': ''
+            };
+
+            var img =  `/assets/svg/${markers[elem]}.svg`;
+
+            self.img = img;
+            localStorage.setItem('markerImg', img);
+
+            $('.marker').attr('src', img);
+
+            //TODO Set the custom marker icon for all markers.
+            self.markers.forEach(marker => {
+                const markerElement = self.createMarkerElement(img);
+                document.querySelector('.poteka-marker').firstChild.replaceWith(markerElement);
+            });
+        });
 
     }
 
